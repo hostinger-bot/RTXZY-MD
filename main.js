@@ -1,6 +1,8 @@
+(async() => {
 require('./config')
 const {
   useSingleFileAuthState,
+  useMultiFileAuthState
   DisconnectReason
 } = require('@adiwajshing/baileys')
 const WebSocket = require('ws')
@@ -63,14 +65,14 @@ loadDatabase()
 // if (opts['cluster']) {
 //   require('./lib/cluster').Cluster()
 // }
-global.authFile = `${opts._[0] || 'sessiontxzy'}.data.json`
-global.isInit = !fs.existsSync(authFile)
-const { state, saveState } = useSingleFileAuthState(global.authFile)
+const authFile = `${opts._[0] || 'wamd'}.data.json`
+//global.isInit = !fs.existsSync(authFile)
+const { state, saveState, saveCreds } = await useMultiFileAuthState('sessions')
 
 const connectionOptions = {
   printQRInTerminal: true,
   auth: state,
-  logger: P({ level: 'debug' }),
+  logger: P({ level: 'silent' }),
   version: [2, 2204, 13]
 }
 
@@ -79,7 +81,7 @@ global.conn = simple.makeWASocket(connectionOptions)
 if (!opts['test']) {
   if (global.db) setInterval(async () => {
     if (global.db.data) await global.db.write()
-    if (opts['autocleartmp'] && (global.support || {}).find) (tmp = [os.tmpdir(), 'tmp'], tmp.forEach(filename => cp.spawn('find', [filename, '-amin', '3', '-type', 'f', '-delete'])))
+    if (!opts['tmp'] && (global.support || {}).find) (tmp = [os.tmpdir(), 'tmp'], tmp.forEach(filename => cp.spawn('find', [filename, '-amin', '3', '-type', 'f', '-delete'])))
   }, 30 * 1000)
 }
 
@@ -90,7 +92,7 @@ async function connectionUpdate(update) {
     console.log(global.reloadHandler(true))
   }
   if (global.db.data == null) await loadDatabase()
-  console.log(JSON.stringify(update, null, 4))
+ // console.log(JSON.stringify(update, null, 4))
 }
 
 
@@ -124,15 +126,15 @@ global.reloadHandler = function (restatConn) {
     conn.ev.off('creds.update', conn.credsUpdate)
   }
 
-  conn.welcome = 'Hai @user Selamat Datang\n\nDi Grup @subject\nKetik .intro untuk menampilkan card intro'
-  conn.bye = '@user Telah Meninggalkan Percakapan Grup.'
+  conn.welcome = '◪ Halo @user !\n◪ Selamat Datang Di Grup @subject\n◪ Baca Deskripsi Terlebih Dahulu!\n◪ @desc\n◪ Ketik .intro Untuk Menampilkan Card Intro'
+  conn.bye = '◪ @user Telah Meninggalkan Grup\n◪ Selamat Tinggal.'
   conn.spromote = '@user sekarang admin!'
   conn.sdemote = '@user sekarang bukan admin!'
   conn.handler = handler.handler.bind(conn)
   conn.participantsUpdate = handler.participantsUpdate.bind(conn)
   conn.onDelete = handler.delete.bind(conn)
   conn.connectionUpdate = connectionUpdate.bind(conn)
-  conn.credsUpdate = saveState.bind(conn)
+  conn.credsUpdate = saveCreds.bind(conn)
 
   conn.ev.on('messages.upsert', conn.handler)
   conn.ev.on('group-participants.update', conn.participantsUpdate)
@@ -225,3 +227,4 @@ async function _quickTest() {
 _quickTest()
   .then(() => conn.logger.info('Quick Test Done'))
   .catch(console.error)
+})()
